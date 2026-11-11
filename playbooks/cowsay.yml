@@ -1,0 +1,14 @@
+---
+- name: Cowsay
+  hosts: dain
+  become: true
+  tasks:
+    - name: Repozitar EPEL
+      ansible.builtin.dnf:
+        name: epel-release
+        state: present
+
+    - name: Balicek cowsay
+      ansible.builtin.dnf:
+        name: cowsay
+        state: present
