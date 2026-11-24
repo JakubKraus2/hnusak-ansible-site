@@ -1,0 +1,66 @@
+---
+- name: Samba
+  hosts: dain
+  become: true
+
+  tasks:
+    - name: Instalace Samby
+      ansible.builtin.dnf:
+        name:
+          - samba
+          - samba-common-tools
+        state: present
+
+    - name: Vytvoreni Samba uzivatele
+      ansible.builtin.user:
+        name: "{{ samba_user }}"
+        state: present
+        create_home: false
+        shell: /sbin/nologin
+        password: "!"
+
+    - name: Vytvoreni sdilenych adresaru
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ samba_user }}"
+        group: "{{ samba_user }}"
+        mode: "0770"
+        setype: samba_share_t
+      loop: "{{ samba_shares }}"
+
+    - name: Konfigurace Samby
+      ansible.builtin.template:
+        src: smb.conf.j2
+        dest: /etc/samba/smb.conf
+        owner: root
+        group: root
+        mode: "0644"
+        validate: "testparm -s %s"
+      notify: Restart Samba
+
+    - name: Povoleni Samba portu pro IPv4 sit TUL
+      ansible.posix.firewalld:
+        rich_rule: 'rule family="ipv4" source address="147.230.0.0/16" port port="445" protocol="tcp" accept'
+        permanent: true
+        immediate: true
+        state: enabled
+
+    - name: Povoleni Samba portu pro IPv6 sit TUL
+      ansible.posix.firewalld:
+        rich_rule: 'rule family="ipv6" source address="2001:718:1c01::/48" port port="445" protocol="tcp" accept'
+        permanent: true
+        immediate: true
+        state: enabled
+
+    - name: Spusteni Samba serveru
+      ansible.builtin.service:
+        name: smb
+        state: started
+        enabled: true
+
+  handlers:
+    - name: Restart Samba
+      ansible.builtin.service:
+        name: smb
+        state: restarted
